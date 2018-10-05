@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="home">
+
+	<insert id="showMemberInsert">
+		insert into show_member
+		(userid,passwd,name,jumin,email,hp,juso) values
+		(#{userid},#{passwd},#{name},#{jumin},#{email},#{hp},#{juso})
+	</insert>
+	<select id="loginCheck" resultType="String">
+		select userid from show_member where userid=#{userid} and passwd=#{passwd}
+	</select>
+	<select id="showMouthList" resultType="home.dto.ShowDTO">
+		select name,price,product from show where product='치약' or product='칫솔' order
+		by product
+	</select>
+	<select id="showMyeondoList" resultType="home.dto.ShowDTO">
+		select name,price,product from show where product='면도기' or product='면도날'
+		order by product
+	</select>
+	<select id="showSeanList" resultType="home.dto.ShowDTO">
+		select name,price,product from show where product='세안용품' order by product
+	</select>
+	<select id="showBadiList" resultType="home.dto.ShowDTO">
+		select name,price,product from show where product='바디워시' order by product
+	</select>
+	<select id="showSyampuList" resultType="home.dto.ShowDTO">
+		select name,price,product from show where product='샴푸' order by product
+	</select>
+	<select id="showYuyeonjeList" resultType="home.dto.ShowDTO">
+		select name,price,product from show where product='섬유유연제' order by product
+	</select>
+	<select id="showBagunyList" resultType="home.dto.ShowDTO">
+		select * from show order by product
+	</select>
+	<select id="memberWrite" resultType="home.dto.ShowMemberDTO">
+		select * from show_member where userid=#{userid}
+	</select>
+
+	<update id="memberUpdate">
+		update show_member set passwd=#{passwd}, email=#{email}, hp=#{hp},
+		juso=#{juso} where userid=#{userid}
+	</update>
+
+	<delete id="memberDelete">
+		delete from show_member where userid=#{userid}
+	</delete>
+
+	<select id="userid_check" resultType="home.dto.ShowMemberDTO">
+		select userid from show_member where userid=#{userid}
+	</select>
+
+
+
+	<select id="list" resultType="home.dto.BoardDTO">
+		select *
+		from (
+		select A.*, rownum as rn
+		from (
+		select num,userid,subject,reg_date,readcount
+		,filename,filesize,down,re_level
+		,(select count(*) from board_comment
+		where board_num=num) comment_count, show
+		from board
+		order by ref desc, re_step
+		) A
+		)
+		where rn between #{start} and #{end}
+	</select>
+
+	<!-- 게시물 저장 -->
+	<insert id="insert">
+		insert into board
+		(num,userid,subject,passwd,ref,
+		re_step,re_level,content,ip,filename,filesize)
+		values
+		( (select nvl(max(num)+1,1) from board)
+		,#{userid},#{subject},#{passwd}
+		,(select nvl(max(num)+1,1) from board)
+		,1,0,#{content},#{ip},#{filename},#{filesize})
+	</insert>
+
+	<select id="getFileName" resultType="String">
+		select filename
+		from board
+		where num=#{num}
+	</select>
+
+	<update id="plusDown">
+		update board set down=down+1 where num=#{num}
+	</update>
+
+	<!-- 게시물 상세 정보 -->
+	<select id="view" resultType="home.dto.BoardDTO">
+		select * from board
+		where num=#{num}
+	</select>
+
+	<!-- 조회수 증가 처리 -->
+	<update id="plusReadCount">
+		update board set readcount=readcount+1
+		where num=#{num}
+	</update>
+
+	<!-- 댓글 목록 -->
+	<select id="commentList" resultType="home.dto.BoardCommentDTO">
+		select * from board_comment
+		where board_num=#{num}
+	</select>
+
+	<!-- 댓글 쓰기 -->
+	<insert id="commentAdd">
+		insert into board_comment
+		(comment_num,board_num,writer,content) values
+		((select nvl(max(comment_num)+1,1) from board_comment)
+		, #{board_num}, #{writer}, #{content})
+	</insert>
+
+	<!-- 답글 순서 조정 -->
+	<update id="updateStep">
+		update board
+		set re_step=re_step+1
+		where ref=#{ref} and re_step >= #{re_step}
+	</update>
+
+	<!-- 답글 쓰기 -->
+	<insert id="reply">
+		insert into board
+		(num,userid,subject,passwd,ref,re_step,re_level,content,ip,filename,filesize)
+		values
+		( (select nvl(max(num)+1,1) from board)
+		,#{userid},#{subject},#{passwd}
+		,#{ref},#{re_step},#{re_level}
+		,#{content},#{ip},#{filename},#{filesize})
+	</insert>
+
+	<!-- 비밀번호 체크 -->
+	<select id="pass_check" resultType="String">
+		select passwd from board
+		where userid=#{userid} and passwd=#{passwd} and num=#{num}
+	</select>
+
+	<!-- <select id="passwd_check" resultType="String"> select passwd from board 
+		where userid=#{userid} and passwd=#{passwd} </select> -->
+
+	<!-- 게시물 수정 -->
+	<update id="update">
+		update board
+		set userid=#{userid}, subject=#{subject}
+		, content=#{content}, filename=#{filename}
+		, filesize=#{filesize}, down=#{down}
+		where num=#{num}
+	</update>
+
+	<!-- 삭제(진짜 삭제 X) -->
+	<update id="delete">
+		update board set show='n'
+		where num=#{num}
+	</update>
+
+	<select id="searchList" resultType="home.dto.BoardDTO">
+		 select num,userid,subject,reg_date,readcount
+      ,filename,filesize,down,re_level
+      ,(select count(*) from board_comment 
+    where board_num=num) comment_count, show
+    from board
+		<choose>
+			<when test="search_option != 'all' ">
+				where ${search_option} like #{keyword} 
+				and show='y' 
+			</when>
+			<otherwise>
+				where ( userid like #{keyword} 
+				or subject like #{keyword} 
+				or content like #{keyword} ) 
+				and show='y' 
+			</otherwise>
+		</choose>
+		order by ref desc, re_step 
+	</select>
+
+	<!-- 게시물 갯수 계산 -->
+	<select id="count" resultType="int">
+		select count(*) from board
+	</select>
+
+</mapper>
